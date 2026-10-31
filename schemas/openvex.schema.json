@@ -1,1 +1,23 @@
-{}
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@context", "statements"],
+  "properties": {
+    "@context": {"const": "https://openvex.dev/ns/v1"},
+    "statements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["vulnerability", "products", "status", "impact_statement"],
+        "properties": {
+          "vulnerability": {"type": "object", "required": ["name"]},
+          "products": {"type": "array", "items": {"type": "object", "required": ["@id"]}},
+          "status": {"enum": ["affected", "not_affected", "under_investigation"]},
+          "justification": {"enum": ["inline_code_not_reachable"]},
+          "impact_statement": {"type": "string"}
+        }
+      }
+    }
+  }
+}
+

@@ -1,1 +1,30 @@
-{}
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["bomFormat", "specVersion", "version", "vulnerabilities"],
+  "properties": {
+    "bomFormat": {"const": "CycloneDX"},
+    "specVersion": {"type": "string"},
+    "version": {"type": "integer"},
+    "vulnerabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "analysis"],
+        "properties": {
+          "id": {"type": "string"},
+          "analysis": {
+            "type": "object",
+            "required": ["state", "detail"],
+            "properties": {
+              "state": {"enum": ["affected", "not_affected", "under_investigation"]},
+              "justification": {"type": ["string", "null"]},
+              "detail": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
