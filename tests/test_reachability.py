@@ -173,6 +173,85 @@ def test_dynamic_execution_and_parse_failures_are_conservative(tmp_path: Path) -
     assert degraded["parse_failures"] == ["one.py", "two.py"]
 
 
+def test_reachable_dynamic_execution_for_unimported_package_is_unknown(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "main.py").write_text(
+        "import importlib\n"
+        "\n"
+        "def run(name):\n"
+        "    return importlib.import_module(name)\n"
+        "\n"
+        "if __name__ == '__main__':\n"
+        "    run('plugins')\n",
+        encoding="utf-8",
+    )
+
+    result = analyze(
+        str(tmp_path),
+        [_target("CVE-UNIMPORTED", "unimported_pkg", "unimported_pkg.vulnerable")],
+    )
+
+    finding = result["findings"][0]
+    assert finding["reach_status"] == "unknown_dynamic_execution"
+    assert finding["needs_manual_review"] is True
+    assert finding["paths"]
+
+
+def test_dead_calls_for_imported_package_remain_unreachable_with_dynamic_node(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "main.py").write_text(
+        "import importlib\n"
+        "import vulnerable_pkg\n"
+        "\n"
+        "def run(name):\n"
+        "    return importlib.import_module(name)\n"
+        "\n"
+        "def dead():\n"
+        "    vulnerable_pkg.vulnerable()\n"
+        "\n"
+        "if __name__ == '__main__':\n"
+        "    run('plugins')\n",
+        encoding="utf-8",
+    )
+
+    result = analyze(
+        str(tmp_path),
+        [_target("CVE-IMPORTED", "vulnerable_pkg", "vulnerable_pkg.vulnerable")],
+    )
+
+    finding = result["findings"][0]
+    assert finding["reach_status"] == "unreachable"
+    assert finding["confidence"] == 1.0
+    assert finding["needs_manual_review"] is False
+
+
+def test_unreachable_package_without_reachable_dynamic_node_stays_unreachable(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "main.py").write_text(
+        "import importlib\n"
+        "import vulnerable_pkg\n"
+        "\n"
+        "def dead_dynamic(name):\n"
+        "    return importlib.import_module(name)\n"
+        "\n"
+        "def dead():\n"
+        "    vulnerable_pkg.vulnerable()\n",
+        encoding="utf-8",
+    )
+
+    result = analyze(
+        str(tmp_path),
+        [_target("CVE-NO-DYNAMIC", "vulnerable_pkg", "vulnerable_pkg.vulnerable")],
+    )
+
+    finding = result["findings"][0]
+    assert finding["reach_status"] == "unreachable"
+    assert finding["confidence"] == 1.0
+
+
 def test_garbage_input_returns_an_error_result() -> None:
     invalid_path = analyze("", [])
     invalid_targets = analyze(str(GROUND_TRUTH), None)  # type: ignore[arg-type]
