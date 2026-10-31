@@ -205,12 +205,11 @@ def _parse_advisories(
     payload: dict[str, Any], name: str, version: str
 ) -> list[Advisory]:
     """Convert an OSV query payload to contract advisories."""
-    if "vulns" not in payload:
-        raise ValueError("OSV response is missing field 'vulns'")
-    vulnerabilities = payload["vulns"]
+    vulnerabilities = payload.get("vulns", [])
     if not isinstance(vulnerabilities, list):
         raise ValueError("OSV response field 'vulns' must be a list")
     advisories: list[Advisory] = []
+    seen_aliases: set[str] = set()
     for vulnerability in vulnerabilities:
         if not isinstance(vulnerability, dict):
             raise ValueError("OSV response contains a malformed vulnerability")
@@ -218,6 +217,16 @@ def _parse_advisories(
         if not isinstance(osv_id, str) or not osv_id:
             raise ValueError("OSV vulnerability is missing its id")
         aliases = vulnerability.get("aliases", [])
+        alias_ids = {osv_id.upper()}
+        if isinstance(aliases, list):
+            alias_ids.update(
+                alias.upper() for alias in aliases
+                if isinstance(alias, str) and alias
+            )
+        is_duplicate = bool(alias_ids & seen_aliases)
+        seen_aliases.update(alias_ids)
+        if is_duplicate:
+            continue
         cve_id = next(
             (
                 alias for alias in aliases
@@ -253,6 +262,32 @@ def _parse_advisories(
             }
         )
     return advisories
+
+
+def dedupe_advisories(
+    advisories: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep the first advisory for each vulnerability alias group."""
+    unique: list[dict[str, Any]] = []
+    seen_aliases: set[str] = set()
+    for advisory in advisories:
+        identifiers: set[str] = set()
+        for key in ("cve_id", "osv_id"):
+            value = advisory.get(key)
+            if isinstance(value, str) and value:
+                identifiers.add(value.upper())
+        aliases = advisory.get("aliases")
+        if isinstance(aliases, list):
+            identifiers.update(
+                alias.upper() for alias in aliases
+                if isinstance(alias, str) and alias
+            )
+        is_duplicate = bool(identifiers & seen_aliases)
+        seen_aliases.update(identifiers)
+        if is_duplicate:
+            continue
+        unique.append(advisory)
+    return unique
 
 
 def _golden_fallback(name: str, version: str) -> list[Advisory] | None:
