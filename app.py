@@ -1,16 +1,33 @@
+import os
+
 import streamlit as st
-from pipeline import run_scan
+from pipeline import run_scan, run_scan_url
 from ui import findings_panel, graph_panel, callpath_panel, export_panel
 
 st.set_page_config(page_title="Reachability-Aware Supply-Chain Security", layout="wide")
 st.sidebar.title("Supply-Chain Scan")
-repo_path = st.sidebar.text_input("Repository path", "fixtures/ground_truth_repo")
+public_mode = os.environ.get("HAWKEYE_PUBLIC") == "1"
+if not public_mode:
+    repo_path = st.sidebar.text_input("Repository path", "fixtures/ground_truth_repo")
+github_url = st.sidebar.text_input("GitHub repository URL")
+if st.sidebar.button("Scan"):
+    with st.status("Downloading... Analysing... Querying OSV...") as status:
+        scan_result = run_scan_url(github_url)
+        status.update(
+            label="Scan complete" if scan_result.get("ok") is not False else "Scan failed",
+            state="complete" if scan_result.get("ok") is not False else "error",
+        )
+    st.session_state["scan"] = scan_result
 if st.sidebar.button("Scan ground-truth demo"):
     with st.spinner("Scanning repository..."):
-        st.session_state["scan"] = run_scan(repo_path)
-if "scan" not in st.session_state:
+        demo_path = "fixtures/ground_truth_repo" if public_mode else repo_path
+        st.session_state["scan"] = run_scan(demo_path)
+if not public_mode and "scan" not in st.session_state:
     with st.spinner("Scanning repository..."):
         st.session_state["scan"] = run_scan("fixtures/ground_truth_repo")
+if "scan" not in st.session_state:
+    st.info("Scan a GitHub repository or choose the bundled demo to get started.")
+    st.stop()
 scan = st.session_state["scan"]
 if scan.get("ok") is False:
     st.error(scan.get("error") or "Scan failed")

@@ -1,16 +1,19 @@
 import logging
 from pathlib import Path
+import tempfile
 from typing import Any, cast
 from urllib.parse import quote
 
 import osv_client
 import reachability
+import repo_fetcher
 import sbom_engine
 import typo_inspector
 import vex_generator
 from contracts import ScanResult, empty_result
 
 LOGGER = logging.getLogger(__name__)
+_MAX_OSV_PACKAGES = 150
 
 
 def _failed_result(kind: str, stage: str, error: Exception | str) -> dict[str, Any]:
@@ -56,7 +59,13 @@ def run_scan(repo_path: str) -> ScanResult:
     advisories: list[dict[str, Any]] = []
     query_warnings: list[str] = []
     query_errors: list[str] = []
-    for package in sbom["packages"]:
+    packages_to_query = sbom["packages"][:_MAX_OSV_PACKAGES]
+    if len(sbom["packages"]) > _MAX_OSV_PACKAGES:
+        query_warnings.append(
+            f"OSV queries capped at {_MAX_OSV_PACKAGES} packages; "
+            f"{len(sbom['packages']) - _MAX_OSV_PACKAGES} packages were not queried."
+        )
+    for package in packages_to_query:
         if not isinstance(package, dict) or not all(
             isinstance(package.get(field), str)
             for field in ("name", "version", "ecosystem")
@@ -207,3 +216,62 @@ def run_scan(repo_path: str) -> ScanResult:
             "vex": vex,
         },
     )
+
+
+def run_scan_url(url: str) -> ScanResult:
+    """Fetch and scan a public GitHub repository without retaining its files."""
+    temporary_directory: tempfile.TemporaryDirectory[str] | None = None
+    result: dict[str, Any]
+    try:
+        temporary_directory = tempfile.TemporaryDirectory(prefix="hawkeye-github-")
+        extracted_path = repo_fetcher.fetch(url, temporary_directory.name)
+        scan = run_scan(extracted_path)
+        scan["target"] = url
+
+        warnings = scan.setdefault("warnings", [])
+        if not isinstance(warnings, list):
+            warnings = []
+            scan["warnings"] = warnings
+        if not any(Path(extracted_path).rglob("*.py")):
+            warnings.append(
+                "Repository contains no Python files; reachability analysis may be incomplete."
+            )
+        packages = scan.get("sbom", {}).get("packages", [])
+        unpinned = [
+            package.get("name", "unknown package")
+            for package in packages
+            if isinstance(package, dict) and not str(package.get("version", "")).strip()
+        ]
+        if unpinned:
+            sample = ", ".join(str(name) for name in unpinned[:10])
+            remainder = len(unpinned) - 10
+            if remainder > 0:
+                sample += f", and {remainder} more"
+            warnings.append(
+                "Packages without a pinned version cannot be checked precisely: "
+                f"{sample}."
+            )
+        scan["warnings"] = list(
+            dict.fromkeys(warning for warning in warnings if isinstance(warning, str))
+        )
+        result = scan
+    except Exception as exc:
+        if isinstance(exc, ValueError):
+            error = str(exc) or "GitHub repository scan failed."
+        else:
+            LOGGER.exception("GitHub repository scan failed")
+            error = f"GitHub scan failed ({type(exc).__name__})."
+        result = empty_result("scan", error)
+        result["target"] = url if isinstance(url, str) else ""
+        result["warnings"] = [error]
+    finally:
+        if temporary_directory is not None:
+            try:
+                temporary_directory.cleanup()
+            except Exception as exc:
+                LOGGER.exception("Temporary GitHub repository cleanup failed")
+                error = f"GitHub scan cleanup failed ({type(exc).__name__})."
+                result = empty_result("scan", error)
+                result["target"] = url if isinstance(url, str) else ""
+                result["warnings"] = [error]
+    return cast(ScanResult, result)
