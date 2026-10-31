@@ -258,6 +258,9 @@ def render(scan: ScanResult) -> None:
         bgcolor=theme["surface"],
         font_color=theme["text"],  # pyright: ignore[reportArgumentType]
     )
+    network.set_options(
+        '{"physics":{"stabilization":{"enabled":true,"iterations":1000,"fit":true}}}'
+    )
     styles = _edge_styles(graph, scan)
     for node in visible_nodes:
         data = graph.nodes[node]
@@ -283,4 +286,41 @@ def render(scan: ScanResult) -> None:
             width=style["width"],
             dashes=style.get("dashes", False),
         )
+    sbom = scan.get("sbom")
+    edges = sbom.get("edges", []) if isinstance(sbom, Mapping) else []
+    if not edges:
+        st.caption(
+            "Dependency edges are not available for this manifest; "
+            "packages are linked to the project root."
+        )
+        target = str(scan.get("target") or "Project").rstrip("/\\")
+        project_name = target.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+        if project_name.endswith(".git"):
+            project_name = project_name[:-4]
+        project_name = project_name or "Project"
+
+        root_id = "__project_root__"
+        while root_id in graph:
+            root_id = f"_{root_id}"
+        network.add_node(
+            escape_html(root_id),
+            label=escape_html(project_name),
+            color="#7f8c8d",
+            shape="dot",
+        )
+        root_children = {
+            str(package.get("purl") or package.get("name"))
+            for package in packages
+            if package.get("purl") or package.get("name")
+            if package.get("scope") == "direct"
+            or graph.in_degree(str(package.get("purl") or package.get("name"))) == 0
+        }
+        for child in root_children & visible_nodes:
+            network.add_edge(
+                escape_html(root_id),
+                escape_html(child),
+                color="#7f8c8d",
+                width=1,
+                dashes=True,
+            )
     components_html(network.generate_html(), height=480)

@@ -275,3 +275,63 @@ def run_scan_url(url: str) -> ScanResult:
                 result["target"] = url if isinstance(url, str) else ""
                 result["warnings"] = [error]
     return cast(ScanResult, result)
+
+
+def run_scan_zip(data: bytes) -> ScanResult:
+    """Safely extract and scan an uploaded ZIP without retaining its files."""
+    target = "uploaded ZIP"
+    if not isinstance(data, bytes):
+        result = empty_result("scan", "ZIP upload must be provided as bytes.")
+        result["target"] = target
+        return cast(ScanResult, result)
+    if len(data) > 10 * 1024 * 1024:
+        result = empty_result("scan", "ZIP upload exceeds the 10 MB limit.")
+        result["target"] = target
+        return cast(ScanResult, result)
+
+    temporary_directory: tempfile.TemporaryDirectory[str] | None = None
+    archive_file: tempfile.SpooledTemporaryFile[bytes] | None = None
+    result: dict[str, Any]
+    try:
+        temporary_directory = tempfile.TemporaryDirectory(prefix="hawkeye-upload-")
+        archive_file = tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024)
+        archive_file.write(data)
+        archive_file.seek(0)
+        extracted_path = repo_fetcher._extract(
+            archive_file, Path(temporary_directory.name), "upload"
+        )
+        result = run_scan(extracted_path)
+        result["target"] = target
+    except Exception as exc:
+        if isinstance(exc, ValueError):
+            error = str(exc) or "ZIP upload scan failed."
+            if error == "GitHub did not return a valid ZIP archive.":
+                error = "Uploaded file is not a valid ZIP archive."
+            else:
+                error = error.replace("GitHub archive", "Uploaded ZIP archive")
+        else:
+            LOGGER.exception("Uploaded ZIP scan failed")
+            error = f"ZIP upload scan failed ({type(exc).__name__})."
+        result = empty_result("scan", error)
+        result["target"] = target
+        result["warnings"] = [error]
+    finally:
+        if archive_file is not None:
+            try:
+                archive_file.close()
+            except Exception as exc:
+                LOGGER.exception("Uploaded ZIP stream cleanup failed")
+                error = f"ZIP upload cleanup failed ({type(exc).__name__})."
+                result = empty_result("scan", error)
+                result["target"] = target
+                result["warnings"] = [error]
+        if temporary_directory is not None:
+            try:
+                temporary_directory.cleanup()
+            except Exception as exc:
+                LOGGER.exception("Temporary uploaded repository cleanup failed")
+                error = f"ZIP upload cleanup failed ({type(exc).__name__})."
+                result = empty_result("scan", error)
+                result["target"] = target
+                result["warnings"] = [error]
+    return cast(ScanResult, result)
