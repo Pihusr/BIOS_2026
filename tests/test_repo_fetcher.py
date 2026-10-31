@@ -8,6 +8,7 @@ import stat
 import sys
 import tempfile
 import types
+from typing import Any
 import zipfile
 
 import pytest
@@ -429,7 +430,7 @@ def test_run_scan_url_sets_target_and_cleans_temp_dir(
     real_temporary_directory = tempfile.TemporaryDirectory
     temporary_paths: list[Path] = []
 
-    def tracking_temporary_directory(*args: object, **kwargs: object):
+    def tracking_temporary_directory(*args: Any, **kwargs: Any):
         directory = real_temporary_directory(*args, **kwargs)
         temporary_paths.append(Path(directory.name))
         return directory
@@ -492,7 +493,7 @@ def test_run_scan_url_failure_cleans_temp_dir(
     real_temporary_directory = tempfile.TemporaryDirectory
     temporary_paths: list[Path] = []
 
-    def tracking_temporary_directory(*args: object, **kwargs: object):
+    def tracking_temporary_directory(*args: Any, **kwargs: Any):
         directory = real_temporary_directory(*args, **kwargs)
         temporary_paths.append(Path(directory.name))
         return directory
@@ -614,15 +615,15 @@ def test_public_app_hides_local_path_input(
 
     sidebar = Sidebar()
     fake_streamlit = types.ModuleType("streamlit")
-    fake_streamlit.sidebar = sidebar
-    fake_streamlit.session_state = {}
-    fake_streamlit.set_page_config = lambda **kwargs: None
-    fake_streamlit.info = lambda message: None
-    fake_streamlit.stop = lambda: (_ for _ in ()).throw(StopApp())
+    setattr(fake_streamlit, "sidebar", sidebar)
+    setattr(fake_streamlit, "session_state", {})
+    setattr(fake_streamlit, "set_page_config", lambda **kwargs: None)
+    setattr(fake_streamlit, "info", lambda message: None)
+    setattr(fake_streamlit, "stop", lambda: (_ for _ in ()).throw(StopApp()))
 
     fake_pipeline = types.ModuleType("pipeline")
-    fake_pipeline.run_scan = lambda path: pytest.fail("public mode must not scan a local path")
-    fake_pipeline.run_scan_url = lambda url: pytest.fail("Scan button was not selected")
+    setattr(fake_pipeline, "run_scan", lambda path: pytest.fail("public mode must not scan a local path"))
+    setattr(fake_pipeline, "run_scan_url", lambda url: pytest.fail("Scan button was not selected"))
     fake_ui = types.ModuleType("ui")
     for panel_name in (
         "findings_panel",

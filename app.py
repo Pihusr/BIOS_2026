@@ -1,17 +1,30 @@
 import os
-from pathlib import Path
 
 import streamlit as st
 from pipeline import run_scan, run_scan_url, run_scan_zip
 from ui import findings_panel, graph_panel, callpath_panel, export_panel
+from ui.theme import apply_hawkeye_theme
 
 _MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 st.set_page_config(page_title="HawkEye", layout="wide")
-st.logo(str(Path(__file__).parent / ".docs" / "Hawk EYE logo.svg"), size="large")
-st.sidebar.title("HawkEye")
-st.sidebar.caption("Reachability-aware supply-chain security")
+_logo_data_uri = apply_hawkeye_theme()
+st.sidebar.markdown(
+    f"""
+    <div class="hawkeye-brand">
+        <img src="{_logo_data_uri}" alt="" />
+        <div>
+            <div class="hawkeye-brand-name">HawkEye</div>
+            <div class="hawkeye-brand-tagline">
+                Reachability-aware supply-chain security
+            </div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 public_mode = os.environ.get("HAWKEYE_PUBLIC") == "1"
+repo_path = "fixtures/ground_truth_repo"
 if not public_mode:
     with st.sidebar.expander("Advanced: local folder"):
         repo_path = st.text_input("Repository path", "fixtures/ground_truth_repo")
@@ -36,21 +49,24 @@ if hasattr(st.sidebar, "file_uploader"):
     if st.sidebar.button(
         "Scan upload", disabled=uploaded_zip is None or upload_too_large
     ):
-        upload_data = uploaded_zip.getvalue()
-        if len(upload_data) > _MAX_UPLOAD_BYTES:
-            st.error("ZIP upload exceeds the 10 MB limit.")
+        if uploaded_zip is None:
+            st.error("Select a ZIP file to upload.")
         else:
-            with st.status("Uploading... Analysing... Querying OSV...") as status:
-                scan_result = run_scan_zip(upload_data)
-                status.update(
-                    label="Scan complete"
-                    if scan_result.get("ok") is not False
-                    else "Scan failed",
-                    state="complete"
-                    if scan_result.get("ok") is not False
-                    else "error",
-                )
-            st.session_state["scan"] = scan_result
+            upload_data = uploaded_zip.getvalue()
+            if len(upload_data) > _MAX_UPLOAD_BYTES:
+                st.error("ZIP upload exceeds the 10 MB limit.")
+            else:
+                with st.status("Uploading... Analysing... Querying OSV...") as status:
+                    scan_result = run_scan_zip(upload_data)
+                    status.update(
+                        label="Scan complete"
+                        if scan_result.get("ok") is not False
+                        else "Scan failed",
+                        state="complete"
+                        if scan_result.get("ok") is not False
+                        else "error",
+                    )
+                st.session_state["scan"] = scan_result
 if st.sidebar.button("Scan ground-truth demo"):
     with st.spinner("Scanning repository..."):
         demo_path = "fixtures/ground_truth_repo" if public_mode else repo_path

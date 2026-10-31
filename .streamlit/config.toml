@@ -1,2 +1,32 @@
 [server]
 maxUploadSize = 10
+
+[theme]
+base = "dark"
+primaryColor = "#6B1C1C"
+backgroundColor = "#080808"
+secondaryBackgroundColor = "#0F0F0F"
+textColor = "#F2F2F2"
+linkColor = "#9CC8FF"
+codeBackgroundColor = "#0A0A0A"
+codeTextColor = "#B8E3C5"
+borderColor = "#2B2B2B"
+redColor = "#E7A8A8"
+redBackgroundColor = "#4D0A0A"
+redTextColor = "#F2F2F2"
+greenColor = "#A6DBB4"
+greenBackgroundColor = "#0F3818"
+greenTextColor = "#F2F2F2"
+blueColor = "#9CC8FF"
+blueBackgroundColor = "#0C2B54"
+blueTextColor = "#F2F2F2"
+violetColor = "#D3B4D3"
+violetBackgroundColor = "#3E072D"
+violetTextColor = "#F2F2F2"
+dataframeBorderColor = "#2B2B2B"
+dataframeHeaderBackgroundColor = "#121212"
+dataframeHeaderTextColor = "#F2F2F2"
+showWidgetBorder = true
+showSidebarBorder = true
+baseRadius = "8px"
+buttonRadius = "8px"
