@@ -498,6 +498,26 @@ def _reachable_package_nodes(graph: nx.DiGraph, package: str) -> list[str]:
     )
 
 
+def _has_static_package_evidence(target: VulnTarget, infos: list[dict[str, Any]]) -> bool:
+    """Check whether first-party imports identify the target's package."""
+    distribution_imports = {"pillow": "pil", "pyyaml": "yaml"}
+    package_roots = {
+        target["package"].replace("-", "_").casefold(),
+        distribution_imports.get(target["package"].casefold(), ""),
+        *(
+            symbol.partition(".")[0].replace("-", "_").casefold()
+            for symbol in target["symbols"]
+            if "." in symbol
+        ),
+    }
+    imported_roots = {
+        imported.partition(".")[0].replace("-", "_").casefold()
+        for info in infos
+        for imported in info["aliases"].values()
+    }
+    return bool(package_roots & imported_roots)
+
+
 def _finding(
     target: VulnTarget,
     symbol: str,
@@ -653,6 +673,9 @@ def analyze(repo_path: str, targets: list[VulnTarget]) -> ReachResult:
         warnings: list[str] = []
         for target in sorted(targets, key=lambda item: (item["cve_id"], item["package"])):
             symbols = target["symbols"]
+            target_dynamic_paths = (
+                [] if _has_static_package_evidence(target, infos) else dynamic_paths
+            )
             if not symbols:
                 warnings.append("package-level only")
                 package_nodes = _reachable_package_nodes(graph, target["package"])
@@ -666,7 +689,7 @@ def analyze(repo_path: str, targets: list[VulnTarget]) -> ReachResult:
                 )
                 if package_paths:
                     finding = _finding(
-                        target, target["package"], graph, parse_failures, dynamic_paths
+                        target, target["package"], graph, parse_failures, target_dynamic_paths
                     )
                     finding["reach_status"] = (
                         "over_approximated_path"
@@ -685,13 +708,13 @@ def analyze(repo_path: str, targets: list[VulnTarget]) -> ReachResult:
                 else:
                     findings.append(
                         _finding(
-                            target, target["package"], graph, parse_failures, dynamic_paths
+                            target, target["package"], graph, parse_failures, target_dynamic_paths
                         )
                     )
             else:
                 for symbol in sorted(set(symbols)):
                     findings.append(
-                        _finding(target, symbol, graph, parse_failures, dynamic_paths)
+                        _finding(target, symbol, graph, parse_failures, target_dynamic_paths)
                     )
         warnings.extend(
             f"Skipped invalid Python file: {path}" for path in parse_failures

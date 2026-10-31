@@ -235,7 +235,7 @@ External (optional): **Syft** binary (`brew install syft` / `curl -sSfL https://
 4. Prune branches with constant-false conditions; indeterminate conditions mark downstream edges `over_approximated`.
 5. Detect dynamic features (`getattr`, `eval`, `exec`, `__import__`, `importlib.import_module`) → mark the enclosing function `dynamic=True`.
 6. Entry points: see `CLAUDE.md §2`. Add a virtual `__ENTRY__` node connected to each.
-7. For each `VulnTarget` symbol: `nx.has_path(G, "__ENTRY__", symbol)` → `all_shortest_paths` (cap 3) → `CallFrame[]`. If a dynamic node lies on a plausible route to the package → `unknown_dynamic_execution`.
+7. For each `VulnTarget` symbol: `nx.has_path(G, "__ENTRY__", symbol)` → `all_shortest_paths` (cap 3) → `CallFrame[]`. A reachable dynamic node yields `unknown_dynamic_execution` only when first-party code has no static import evidence for the target package.
 8. Whole-file failure for everything → `degraded=True`, return empty findings + warning (pipeline shows banner and treats CVEs as `affected`, no suppression).
 
 ## 7. Caching (`osv_client.py`)
