@@ -1,0 +1,79 @@
+{
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "advisories": [
+    {
+      "cve_id": "CVE-2023-30861",
+      "osv_id": "GHSA-m2qf-hxjv-5gpq",
+      "package": "Flask",
+      "version": "2.2.2",
+      "summary": "Possible disclosure of permanent session cookies",
+      "severity": "HIGH",
+      "cvss": 7.5,
+      "fixed_in": [
+        "2.2.3"
+      ]
+    },
+    {
+      "cve_id": "CVE-2023-32681",
+      "osv_id": "PYSEC-2023-74",
+      "package": "requests",
+      "version": "2.25.1",
+      "summary": "Unintended leak of Proxy-Authorization header",
+      "severity": "MEDIUM",
+      "cvss": 6.1,
+      "fixed_in": [
+        "2.31.0"
+      ]
+    },
+    {
+      "cve_id": "CVE-2023-50447",
+      "osv_id": "GHSA-3f63-hfp8-52jq",
+      "package": "Pillow",
+      "version": "9.4.0",
+      "summary": "Arbitrary code execution through crafted image operations",
+      "severity": "HIGH",
+      "cvss": 8.1,
+      "fixed_in": [
+        "10.2.0"
+      ]
+    },
+    {
+      "cve_id": "CVE-2020-14343",
+      "osv_id": "PYSEC-2021-142",
+      "package": "PyYAML",
+      "version": "5.3.1",
+      "summary": "Unsafe YAML deserialization can execute arbitrary code",
+      "severity": "CRITICAL",
+      "cvss": 9.8,
+      "fixed_in": [
+        "5.4"
+      ]
+    },
+    {
+      "cve_id": "CVE-2024-22195",
+      "osv_id": "GHSA-h5c8-rqwp-cp95",
+      "package": "Jinja2",
+      "version": "2.11.3",
+      "summary": "HTML attribute injection via xmlattr",
+      "severity": "MEDIUM",
+      "cvss": 5.4,
+      "fixed_in": [
+        "3.1.3"
+      ]
+    },
+    {
+      "cve_id": "CVE-2023-23934",
+      "osv_id": "PYSEC-2023-57",
+      "package": "Werkzeug",
+      "version": "2.2.2",
+      "summary": "Cookie parsing bypass affecting __Host- cookies",
+      "severity": "LOW",
+      "cvss": 3.1,
+      "fixed_in": [
+        "2.2.3"
+      ]
+    }
+  ]
+}

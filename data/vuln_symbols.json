@@ -1,0 +1,8 @@
+{
+  "CVE-2023-30861": ["flask.Flask"],
+  "CVE-2023-32681": ["requests.sessions.Session.send"],
+  "CVE-2023-50447": ["PIL.Image.Image.save"],
+  "CVE-2020-14343": ["yaml.load"],
+  "CVE-2024-22195": ["jinja2.filters.do_xmlattr"],
+  "CVE-2023-23934": ["werkzeug.http.parse_cookie"]
+}

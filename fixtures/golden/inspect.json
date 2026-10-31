@@ -1,0 +1,29 @@
+{
+  "ok": true,
+  "error": null,
+  "warnings": [
+    "Provenance could not be verified for private-source-package"
+  ],
+  "typo_flags": [
+    {
+      "package": "reqeusts",
+      "matched": "requests",
+      "distance": 1,
+      "homoglyph": false,
+      "risk_score": 0.9
+    }
+  ],
+  "provenance": [
+    {
+      "package": "private-source-package",
+      "version": "1.0.0",
+      "has_source_repo": null,
+      "signature_verified": null,
+      "slsa_attested": null,
+      "violations": [
+        "missing source-repo link",
+        "no attestation metadata"
+      ]
+    }
+  ]
+}

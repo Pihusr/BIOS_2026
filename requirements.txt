@@ -1,0 +1,9 @@
+streamlit>=1.35
+pyvis>=0.3.2
+networkx>=3.2
+python-Levenshtein>=0.25
+requests>=2.31
+jsonschema>=4.21
+pytest>=8.0
+# optional, wrapped in try/except at import:
+pycg

@@ -1,0 +1,108 @@
+{
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "findings": [
+    {
+      "cve_id": "CVE-2023-30861",
+      "package": "Flask",
+      "symbol": "flask.Flask",
+      "reach_status": "reachable",
+      "confidence": 1.0,
+      "paths": [
+        [
+          {
+            "file": "fixtures/ground_truth_repo/app.py",
+            "line": 7,
+            "symbol": "status"
+          },
+          {
+            "file": "fixtures/ground_truth_repo/services/http_client.py",
+            "line": 5,
+            "symbol": "fetch_url"
+          }
+        ]
+      ],
+      "needs_manual_review": false,
+      "notes": "Flask route calls the HTTP client"
+    },
+    {
+      "cve_id": "CVE-2023-32681",
+      "package": "requests",
+      "symbol": "requests.sessions.Session.send",
+      "reach_status": "reachable",
+      "confidence": 1.0,
+      "paths": [
+        [
+          {
+            "file": "fixtures/ground_truth_repo/app.py",
+            "line": 7,
+            "symbol": "status"
+          },
+          {
+            "file": "fixtures/ground_truth_repo/services/http_client.py",
+            "line": 6,
+            "symbol": "requests.get"
+          }
+        ]
+      ],
+      "needs_manual_review": false,
+      "notes": "Route reaches requests.get"
+    },
+    {
+      "cve_id": "CVE-2023-50447",
+      "package": "Pillow",
+      "symbol": "PIL.Image.Image.save",
+      "reach_status": "unreachable",
+      "confidence": 1.0,
+      "paths": [],
+      "needs_manual_review": false,
+      "notes": "Legacy import is never called"
+    },
+    {
+      "cve_id": "CVE-2020-14343",
+      "package": "PyYAML",
+      "symbol": "yaml.load",
+      "reach_status": "unreachable",
+      "confidence": 1.0,
+      "paths": [],
+      "needs_manual_review": false,
+      "notes": "Call is in an if False branch"
+    },
+    {
+      "cve_id": "CVE-2024-22195",
+      "package": "Jinja2",
+      "symbol": "jinja2.filters.do_xmlattr",
+      "reach_status": "unreachable",
+      "confidence": 1.0,
+      "paths": [],
+      "needs_manual_review": false,
+      "notes": "Call is guarded by DEBUG=False"
+    },
+    {
+      "cve_id": "CVE-2023-23934",
+      "package": "Werkzeug",
+      "symbol": "werkzeug.http.parse_cookie",
+      "reach_status": "unknown_dynamic_execution",
+      "confidence": 0.6,
+      "paths": [
+        [
+          {
+            "file": "fixtures/ground_truth_repo/plugins/loader.py",
+            "line": 6,
+            "symbol": "getattr"
+          }
+        ]
+      ],
+      "needs_manual_review": false,
+      "notes": "Dynamic getattr/importlib may execute package code"
+    }
+  ],
+  "entry_points": [
+    "fixtures/ground_truth_repo/app.py",
+    "fixtures/ground_truth_repo/services/http_client.py",
+    "fixtures/ground_truth_repo/plugins/loader.py"
+  ],
+  "parse_failures": [],
+  "degraded": false
+}

@@ -1,0 +1,79 @@
+{
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "packages": [
+    {
+      "name": "Flask",
+      "version": "2.2.2",
+      "ecosystem": "PyPI",
+      "purl": "pkg:pypi/flask@2.2.2",
+      "scope": "direct",
+      "depends_on": []
+    },
+    {
+      "name": "requests",
+      "version": "2.25.1",
+      "ecosystem": "PyPI",
+      "purl": "pkg:pypi/requests@2.25.1",
+      "scope": "direct",
+      "depends_on": []
+    },
+    {
+      "name": "Pillow",
+      "version": "9.4.0",
+      "ecosystem": "PyPI",
+      "purl": "pkg:pypi/pillow@9.4.0",
+      "scope": "direct",
+      "depends_on": []
+    },
+    {
+      "name": "PyYAML",
+      "version": "5.3.1",
+      "ecosystem": "PyPI",
+      "purl": "pkg:pypi/pyyaml@5.3.1",
+      "scope": "direct",
+      "depends_on": []
+    },
+    {
+      "name": "Jinja2",
+      "version": "2.11.3",
+      "ecosystem": "PyPI",
+      "purl": "pkg:pypi/jinja2@2.11.3",
+      "scope": "direct",
+      "depends_on": []
+    },
+    {
+      "name": "Werkzeug",
+      "version": "2.2.2",
+      "ecosystem": "PyPI",
+      "purl": "pkg:pypi/werkzeug@2.2.2",
+      "scope": "direct",
+      "depends_on": []
+    },
+    {
+      "name": "reqeusts",
+      "version": "2.25.1",
+      "ecosystem": "PyPI",
+      "purl": "pkg:pypi/reqeusts@2.25.1",
+      "scope": "direct",
+      "depends_on": []
+    },
+    {
+      "name": "private-source-package",
+      "version": "1.0.0",
+      "ecosystem": "PyPI",
+      "purl": "pkg:pypi/private-source-package@1.0.0",
+      "scope": "direct",
+      "depends_on": []
+    }
+  ],
+  "edges": [],
+  "cyclonedx": {
+    "bomFormat": "CycloneDX",
+    "specVersion": "1.5",
+    "components": []
+  },
+  "spdx": {},
+  "source": "manifest"
+}
