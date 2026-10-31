@@ -71,16 +71,45 @@ def test_generate_six_cve_metrics_and_documents():
     assert all("analysis" in vulnerability for vulnerability in cdx["vulnerabilities"])
 
 
-def test_typo_and_provenance_risk_override_suppression():
+def test_missing_attestation_and_slsa_are_informational():
     sbom, osv, reach, inspect = _six_cve_inputs()
     inspect["provenance"] = [{"package": "requests", "version": "1.0", "has_source_repo": None,
                               "signature_verified": None, "slsa_attested": None,
-                              "violations": ["missing source-repo link"]}]
+                              "violations": ["no_attestation", "no_slsa_provenance"]}]
     vex = vex_generator.generate("pkg:generic/demo@1", sbom, osv, reach, inspect)
     finding = next(item for item in vex["findings"] if item["id"] == "CVE-6")
+    assert finding["status"] == "not_affected"
+    assert finding["priority"] == "INFORMATIONAL"
+    assert finding["provenance_tag"] is None
+    assert "signature/attestation" in finding["impact_statement"]
+    assert "SLSA provenance" in finding["impact_statement"]
+
+
+def test_missing_source_repository_overrides_suppression():
+    sbom, osv, reach, inspect = _six_cve_inputs()
+    inspect["provenance"] = [{"package": "requests", "version": "1.0", "has_source_repo": False,
+                              "signature_verified": True, "slsa_attested": True,
+                              "violations": ["missing_source_repo"]}]
+    vex = vex_generator.generate("pkg:generic/demo@1", sbom, osv, reach, inspect)
+    finding = next(item for item in vex["findings"] if item["id"] == "CVE-6")
+
     assert finding["status"] == "affected"
     assert finding["priority"] == "HIGH"
-    assert finding["provenance_tag"]
+    assert finding["provenance_tag"] == "provenance: missing_source_repo"
+    assert vex["metrics"]["actionable_rate_pct"] == 100.0
+
+
+def test_typosquat_flag_overrides_suppression():
+    sbom, osv, reach, inspect = _six_cve_inputs()
+    inspect["typo_flags"] = [
+        {"package": "requests", "matched": "reqeusts", "distance": 1,
+         "homoglyph": False, "risk_score": 0.9}
+    ]
+    vex = vex_generator.generate("pkg:generic/demo@1", sbom, osv, reach, inspect)
+    finding = next(item for item in vex["findings"] if item["id"] == "CVE-6")
+
+    assert finding["status"] == "affected"
+    assert finding["provenance_tag"] == "typosquat: requests -> reqeusts"
 
 
 def test_degraded_reach_keeps_every_cve_visible():

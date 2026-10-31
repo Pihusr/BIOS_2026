@@ -40,9 +40,29 @@ def _provenance_tag(package: str, inspect: InspectResult) -> str | None:
             return f"typosquat: {typo.get('package')} -> {typo.get('matched')}"
     for report in inspect.get("provenance", []) if isinstance(inspect, dict) else []:
         if str(report.get("package", "")).lower() == package_lower:
-            violations = report.get("violations", [])
-            if violations:
-                return "provenance: " + "; ".join(str(item) for item in violations)
+            if report.get("has_source_repo") is False:
+                violations = report.get("violations", [])
+                source_violations = [
+                    str(item) for item in violations
+                    if "source" in str(item).casefold()
+                ] if isinstance(violations, list) else []
+                return "provenance: " + (
+                    "; ".join(source_violations) or "missing_source_repo"
+                )
+    return None
+
+
+def _provenance_note(package: str, inspect: InspectResult) -> str | None:
+    for report in inspect.get("provenance", []) if isinstance(inspect, dict) else []:
+        if str(report.get("package", "")).lower() != package.lower():
+            continue
+        missing = []
+        if report.get("signature_verified") is None or report.get("signature_verified") is False:
+            missing.append("signature/attestation")
+        if report.get("slsa_attested") is None or report.get("slsa_attested") is False:
+            missing.append("SLSA provenance")
+        if missing:
+            return "Informational only: " + " and ".join(missing) + " is missing or unverified."
     return None
 
 
@@ -92,6 +112,11 @@ def generate(target_purl: str, sbom: SBOMResult, osv: OSVResult, reach: ReachRes
             impact = summary or f"Vulnerability assessment for {package}"
             if status == "not_affected":
                 impact += ". static call-graph analysis found this code path unreachable."
+            provenance_note = _provenance_note(package, inspect)
+            if provenance_note:
+                if not impact.endswith((".", "!", "?")):
+                    impact += "."
+                impact += f" {provenance_note}"
             findings.append({"id": cve_id, "package": package,
                              "version": str(advisory.get("version", "")), "status": status,
                              "priority": priority, "justification": justification,

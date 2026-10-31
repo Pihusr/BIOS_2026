@@ -86,6 +86,7 @@ def run_scan(repo_path: str) -> ScanResult:
             LOGGER.exception("OSV query failed for package %s", package["name"])
             query_errors.append(f"{package['name']}: {exc}")
 
+    advisories = osv_client.dedupe_advisories(advisories)
     osv = {
         "ok": not query_errors,
         "error": "; ".join(query_errors) if query_errors else None,

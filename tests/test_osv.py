@@ -91,6 +91,80 @@ def test_query_osv_cache_hit_parses_advisory(cache_db: Path, monkeypatch: pytest
     ]
 
 
+def test_query_osv_empty_object_is_successful_no_advisories(
+    cache_db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class EmptyResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> object:
+            return {}
+
+    monkeypatch.setattr(
+        osv_client.requests, "post", lambda *args, **kwargs: EmptyResponse()
+    )
+    result = osv_client.query_osv("demo-package", "1.0.0")
+
+    assert result["ok"] is True
+    assert result["error"] is None
+    assert result["advisories"] == []
+
+
+def test_query_osv_rejects_json_that_is_not_an_object(
+    cache_db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class NonObjectResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> object:
+            return []
+
+    monkeypatch.setattr(
+        osv_client.requests, "post", lambda *args, **kwargs: NonObjectResponse()
+    )
+    result = osv_client.query_osv("demo-package", "1.0.0")
+
+    assert result["ok"] is False
+    assert "must be an object" in (result["error"] or "")
+    assert result["advisories"] == []
+
+
+def test_parse_advisories_deduplicates_overlapping_osv_aliases() -> None:
+    payload = {
+        "vulns": [
+            {
+                "id": "GHSA-abcd-efgh-ijkl",
+                "aliases": ["CVE-2024-11111", "PYSEC-2024-1"],
+            },
+            {
+                "id": "PYSEC-2024-1",
+                "aliases": ["CVE-2024-11111", "GHSA-abcd-efgh-ijkl"],
+            },
+        ]
+    }
+
+    advisories = osv_client._parse_advisories(payload, "demo-package", "1.0.0")
+
+    assert len(advisories) == 1
+    assert advisories[0]["cve_id"] == "CVE-2024-11111"
+
+
+def test_dedupe_advisories_uses_shared_aliases() -> None:
+    advisories = [
+        {"cve_id": "CVE-2024-11111", "osv_id": "GHSA-abcd-efgh-ijkl",
+         "aliases": ["PYSEC-2024-1"]},
+        {"cve_id": "PYSEC-2024-1", "osv_id": "PYSEC-2024-1"},
+        {"cve_id": "CVE-2024-22222", "osv_id": "GHSA-wxyz-efgh-ijkl"},
+    ]
+
+    assert osv_client.dedupe_advisories(advisories) == [
+        advisories[0],
+        advisories[2],
+    ]
+
+
 def test_query_osv_network_failure_returns_error_and_warning(
     cache_db: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
