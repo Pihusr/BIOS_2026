@@ -214,6 +214,126 @@ def test_fetch_rejects_symlink_entries(
         repo_fetcher.fetch("https://github.com/owner/repo", tmp_path)
 
 
+def test_fetch_allows_more_than_5000_non_whitelisted_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        for index in range(6000):
+            archive.writestr(f"repo-main/assets/file-{index}.dat", b"x")
+        archive.writestr("repo-main/requirements.txt", "requests==2.31")
+    monkeypatch.setattr(
+        repo_fetcher.requests,
+        "get",
+        lambda *args, **kwargs: _Response(output.getvalue()),
+    )
+
+    extracted = Path(repo_fetcher.fetch("https://github.com/owner/repo", tmp_path))
+    assert (extracted / "requirements.txt").read_text(encoding="utf-8") == "requests==2.31"
+    assert len(list(extracted.rglob("*"))) == 1
+
+
+def test_fetch_ignores_compression_ratio_for_non_whitelisted_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("repo-main/assets/zeros.dat", bytes(10 * 1024 * 1024))
+        archive.writestr("repo-main/requirements.txt", "requests==2.31")
+    monkeypatch.setattr(
+        repo_fetcher.requests,
+        "get",
+        lambda *args, **kwargs: _Response(output.getvalue()),
+    )
+
+    extracted = Path(repo_fetcher.fetch("https://github.com/owner/repo", tmp_path))
+    assert (extracted / "requirements.txt").is_file()
+    assert not (extracted / "assets" / "zeros.dat").exists()
+
+
+def test_fetch_rejects_compressible_whitelisted_python_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("repo-main/app.py", bytes(10 * 1024 * 1024))
+    monkeypatch.setattr(
+        repo_fetcher.requests,
+        "get",
+        lambda *args, **kwargs: _Response(output.getvalue()),
+    )
+
+    with pytest.raises(ValueError, match="compression ratio"):
+        repo_fetcher.fetch("https://github.com/owner/repo", tmp_path)
+
+
+def test_fetch_rejects_archive_over_entry_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = _zip_bytes(
+        {f"repo-main/file-{index}.txt": "" for index in range(4)}
+    )
+    monkeypatch.setattr(repo_fetcher, "_MAX_ENTRIES", 3)
+    monkeypatch.setattr(
+        repo_fetcher.requests,
+        "get",
+        lambda *args, **kwargs: _Response(output),
+    )
+
+    with pytest.raises(ValueError, match="more than 3 entries"):
+        repo_fetcher.fetch("https://github.com/owner/repo", tmp_path)
+
+
+def test_fetch_rejects_slow_download(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    response = _Response(chunks=[b"zip-data"])
+    monkeypatch.setattr(
+        repo_fetcher.requests,
+        "get",
+        lambda *args, **kwargs: response,
+    )
+    clock_values = iter([0.0, 61.0])
+    monkeypatch.setattr(repo_fetcher.time, "monotonic", lambda: next(clock_values))
+
+    with pytest.raises(ValueError, match="^Download took too long\\.$"):
+        repo_fetcher.fetch("https://github.com/owner/repo", tmp_path)
+    assert response.closed
+
+
+@pytest.mark.parametrize(
+    ("archive_path", "is_symlink"),
+    [
+        ("repo-main/README.md", True),
+        ("repo-main/../README.md", False),
+    ],
+)
+def test_fetch_checks_unsafe_non_whitelisted_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    archive_path: str,
+    is_symlink: bool,
+) -> None:
+    output = BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        if is_symlink:
+            entry = zipfile.ZipInfo(archive_path)
+            entry.create_system = 3
+            entry.external_attr = (stat.S_IFLNK | 0o777) << 16
+            archive.writestr(entry, "target")
+        else:
+            archive.writestr(archive_path, "not whitelisted")
+    monkeypatch.setattr(
+        repo_fetcher.requests,
+        "get",
+        lambda *args, **kwargs: _Response(output.getvalue()),
+    )
+
+    message = "symbolic link" if is_symlink else "unsafe path"
+    with pytest.raises(ValueError, match=message):
+        repo_fetcher.fetch("https://github.com/owner/repo", tmp_path)
+
+
 def test_fetch_rejects_streamed_download_over_50_mb(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

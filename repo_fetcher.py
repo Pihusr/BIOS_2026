@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 import re
 import stat
 import tempfile
+import time
 from urllib.parse import quote, unquote, urljoin, urlsplit
 import zipfile
 
@@ -18,6 +19,8 @@ _MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024
 _MAX_FILE_BYTES = 2 * 1024 * 1024
 _MAX_TOTAL_BYTES = 100 * 1024 * 1024
 _MAX_FILES = 5000
+_MAX_ENTRIES = 200000
+_MAX_DOWNLOAD_SECONDS = 60
 _MAX_COMPRESSION_RATIO = 100
 _REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 _ALLOWED_REDIRECT_HOSTS = {"github.com", "codeload.github.com"}
@@ -117,6 +120,7 @@ def _redirect_target(current_url: str, location: str) -> str:
 def _download(url: str) -> tempfile.SpooledTemporaryFile[bytes]:
     downloaded = tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024)
     current_url = url
+    started_at = time.monotonic()
     try:
         for redirect_count in range(6):
             response = requests.get(
@@ -153,12 +157,16 @@ def _download(url: str) -> tempfile.SpooledTemporaryFile[bytes]:
 
                 total = 0
                 for chunk in response.iter_content(chunk_size=64 * 1024):
+                    if time.monotonic() - started_at > _MAX_DOWNLOAD_SECONDS:
+                        raise ValueError("Download took too long.")
                     if not chunk:
                         continue
                     total += len(chunk)
                     if total > _MAX_DOWNLOAD_BYTES:
                         raise ValueError("GitHub archive exceeds the 50 MB download limit.")
                     downloaded.write(chunk)
+                if time.monotonic() - started_at > _MAX_DOWNLOAD_SECONDS:
+                    raise ValueError("Download took too long.")
                 downloaded.seek(0)
                 return downloaded
             finally:
@@ -221,56 +229,65 @@ def _extract(
         raise ValueError("GitHub did not return a valid ZIP archive.") from exc
 
     with archive:
+        archive_entries = archive.infolist()
+        if len(archive_entries) > _MAX_ENTRIES:
+            raise ValueError(f"GitHub archive contains more than {_MAX_ENTRIES} entries.")
+
         entries: list[tuple[zipfile.ZipInfo, PurePosixPath]] = []
-        file_count = 0
-        for info in archive.infolist():
+        for info in archive_entries:
             path = _safe_archive_path(
                 info.filename.rstrip("/") if info.is_dir() else info.filename
             )
             mode = (info.external_attr >> 16) & 0xFFFF
             if stat.S_ISLNK(mode):
                 raise ValueError("GitHub archive contains a symbolic link.")
-            if info.is_dir():
-                continue
-            file_count += 1
-            if file_count > _MAX_FILES:
-                raise ValueError("GitHub archive contains more than 5000 files.")
-            if info.file_size and (
-                info.compress_size == 0
-                or info.file_size / info.compress_size > _MAX_COMPRESSION_RATIO
-            ):
-                raise ValueError("GitHub archive contains a suspicious compression ratio.")
             entries.append((info, path))
 
         # GitHub archives have one generated wrapper directory above the repo files.
-        first_parts = {path.parts[0] for _, path in entries if len(path.parts) > 1}
-        has_direct_files = any(len(path.parts) == 1 for _, path in entries)
+        files = [(info, path) for info, path in entries if not info.is_dir()]
+        first_parts = {path.parts[0] for _, path in files if len(path.parts) > 1}
+        has_direct_files = any(len(path.parts) == 1 for _, path in files)
         strip_wrapper = len(first_parts) == 1 and not has_direct_files
         wrapper = next(iter(first_parts)) if strip_wrapper else None
 
         root = (dest_dir / repo).resolve()
         if root.exists():
             raise ValueError("Extraction destination already exists.")
-        root.mkdir(parents=True)
-        extracted_bytes = 0
+
+        extraction_entries: list[tuple[zipfile.ZipInfo, PurePosixPath]] = []
         for info, archive_path in entries:
             relative = archive_path
             if wrapper is not None:
                 if relative.parts[0] != wrapper:
                     raise ValueError("GitHub archive contains inconsistent root paths.")
                 relative = PurePosixPath(*relative.parts[1:])
-            if not relative.parts or not _is_whitelisted(relative):
-                continue
-            if info.file_size > _MAX_FILE_BYTES:
-                raise ValueError("GitHub archive contains a file larger than 2 MB.")
-            if extracted_bytes + info.file_size > _MAX_TOTAL_BYTES:
-                raise ValueError("Extracted GitHub files exceed the 100 MB limit.")
 
             destination = (root / Path(*relative.parts)).resolve()
             try:
                 destination.relative_to(root)
             except ValueError as exc:
                 raise ValueError("GitHub archive contains a path outside the destination.") from exc
+
+            if info.is_dir() or not relative.parts or not _is_whitelisted(relative):
+                continue
+            if len(extraction_entries) >= _MAX_FILES:
+                raise ValueError("GitHub archive contains more than 5000 files.")
+            if info.file_size and (
+                info.compress_size == 0
+                or info.file_size / info.compress_size > _MAX_COMPRESSION_RATIO
+            ):
+                raise ValueError("GitHub archive contains a suspicious compression ratio.")
+            extraction_entries.append((info, relative))
+
+        root.mkdir(parents=True)
+        extracted_bytes = 0
+        for info, relative in extraction_entries:
+            if info.file_size > _MAX_FILE_BYTES:
+                raise ValueError("GitHub archive contains a file larger than 2 MB.")
+            if extracted_bytes + info.file_size > _MAX_TOTAL_BYTES:
+                raise ValueError("Extracted GitHub files exceed the 100 MB limit.")
+
+            destination = (root / Path(*relative.parts)).resolve()
             destination.parent.mkdir(parents=True, exist_ok=True)
             actual_file_bytes = 0
             with archive.open(info) as source, destination.open("xb") as target:
