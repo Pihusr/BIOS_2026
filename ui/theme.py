@@ -55,6 +55,33 @@ def apply_hawkeye_theme() -> str:
             line-height: 1.35;
         }
 
+        .hawkeye-splash {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 6vh;
+            text-align: center;
+        }
+
+        .hawkeye-splash img {
+            box-sizing: border-box;
+            width: min(400px, 70vw);
+            height: min(400px, 70vw);
+            padding: 18px;
+            object-fit: contain;
+            background: #F2F2F2;
+            border: 1px solid #2B2B2B;
+            border-radius: 24px;
+        }
+
+        .hawkeye-splash-name {
+            margin-top: 1.1rem;
+            color: #F2F2F2;
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
         div[data-testid="stTabs"] > div {
             width: 100%;
         }

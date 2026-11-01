@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+import json
 from pathlib import Path
 import zipfile
 from typing import NoReturn
@@ -69,7 +70,27 @@ def test_run_scan_zip_scans_valid_fixture_offline(
     monkeypatch.setattr(typo_inspector.requests, "get", _offline)
 
     result = pipeline.run_scan_zip(_fixture_zip())
+    direct_result = pipeline.run_scan(
+        str(ROOT / "fixtures" / "ground_truth_repo")
+    )
+    oracle = json.loads(
+        (ROOT / "fixtures" / "golden" / "scan_result.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
     assert result.get("ok", True) is True
     assert result["sbom"]["ok"] is True
     assert result["target"] == "uploaded ZIP"
+    assert result["reach"]["findings"] == direct_result["reach"]["findings"]
+    expected_findings = {
+        (finding["id"], finding["package"], finding["status"])
+        for finding in oracle["vex"]["findings"]
+    }
+    zip_findings = {
+        (finding["id"], finding["package"], finding["status"])
+        for finding in result["vex"]["findings"]
+    }
+    assert sum(finding in expected_findings for finding in zip_findings) / max(
+        len(zip_findings), 1
+    ) >= 0.90

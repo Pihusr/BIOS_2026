@@ -1,4 +1,4 @@
-# ARCHITECTURE.md
+    # ARCHITECTURE.md
 
 Reachability-Aware Supply-Chain Security Engine — file structure, contracts, and dependencies.
 

@@ -605,6 +605,9 @@ def test_public_app_hides_local_path_input(
         def title(self, label: str) -> None:
             pass
 
+        def markdown(self, *args: object, **kwargs: object) -> None:
+            pass
+
         def text_input(self, label: str, *args: object, **kwargs: object) -> str:
             self.inputs.append(label)
             return ""
@@ -618,13 +621,24 @@ def test_public_app_hides_local_path_input(
     setattr(fake_streamlit, "sidebar", sidebar)
     setattr(fake_streamlit, "session_state", {})
     setattr(fake_streamlit, "set_page_config", lambda **kwargs: None)
+    setattr(
+        fake_streamlit,
+        "empty",
+        lambda: types.SimpleNamespace(
+            empty=lambda: None,
+            markdown=lambda *args, **kwargs: None,
+        ),
+    )
+    setattr(fake_streamlit, "markdown", lambda *args, **kwargs: None)
     setattr(fake_streamlit, "info", lambda message: None)
     setattr(fake_streamlit, "stop", lambda: (_ for _ in ()).throw(StopApp()))
 
     fake_pipeline = types.ModuleType("pipeline")
-    setattr(fake_pipeline, "run_scan", lambda path: pytest.fail("public mode must not scan a local path"))
     setattr(fake_pipeline, "run_scan_url", lambda url: pytest.fail("Scan button was not selected"))
+    setattr(fake_pipeline, "run_scan_zip", lambda data: pytest.fail("Scan upload was not selected"))
     fake_ui = types.ModuleType("ui")
+    fake_ui_theme = types.ModuleType("ui.theme")
+    setattr(fake_ui_theme, "apply_hawkeye_theme", lambda: "data:image/svg+xml;base64,")
     for panel_name in (
         "findings_panel",
         "graph_panel",
@@ -637,8 +651,9 @@ def test_public_app_hides_local_path_input(
     monkeypatch.setitem(sys.modules, "streamlit", fake_streamlit)
     monkeypatch.setitem(sys.modules, "pipeline", fake_pipeline)
     monkeypatch.setitem(sys.modules, "ui", fake_ui)
+    monkeypatch.setitem(sys.modules, "ui.theme", fake_ui_theme)
     with pytest.raises(StopApp):
         runpy.run_path(str(ROOT / "app.py"))
 
     assert sidebar.inputs == ["GitHub repository URL"]
-    assert sidebar.buttons == ["Scan", "Scan ground-truth demo"]
+    assert sidebar.buttons == ["Scan"]

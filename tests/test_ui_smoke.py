@@ -294,3 +294,14 @@ def test_app_smoke_with_preloaded_golden_scan() -> None:
     at.session_state["scan"] = GOLDEN_SCAN
     at.run()
     assert not at.exception
+
+
+def test_app_shows_only_splash_before_first_scan() -> None:
+    at = AppTest.from_file(str(ROOT / "app.py"))
+    at.run()
+
+    assert not at.exception
+    assert not at.tabs
+    assert not at.info
+    assert any("hawkeye-splash" in element.value for element in at.markdown)
+    assert any("alt=\"HawkEye logo\"" in element.value for element in at.markdown)

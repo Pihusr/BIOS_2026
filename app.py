@@ -1,7 +1,7 @@
 import os
 
 import streamlit as st
-from pipeline import run_scan, run_scan_url, run_scan_zip
+from pipeline import run_scan_url, run_scan_zip
 from ui import findings_panel, graph_panel, callpath_panel, export_panel
 from ui.theme import apply_hawkeye_theme
 
@@ -9,6 +9,7 @@ _MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 st.set_page_config(page_title="HawkEye", layout="wide")
 _logo_data_uri = apply_hawkeye_theme()
+splash_placeholder = st.empty()
 st.sidebar.markdown(
     f"""
     <div class="hawkeye-brand">
@@ -30,6 +31,8 @@ if not public_mode:
         repo_path = st.text_input("Repository path", "fixtures/ground_truth_repo")
 github_url = st.sidebar.text_input("GitHub repository URL")
 if st.sidebar.button("Scan"):
+    st.session_state["scan_started"] = True
+    splash_placeholder.empty()
     with st.status("Downloading... Analysing... Querying OSV...") as status:
         scan_result = run_scan_url(github_url)
         status.update(
@@ -45,17 +48,19 @@ if hasattr(st.sidebar, "file_uploader"):
         uploaded_zip is not None and uploaded_zip.size > _MAX_UPLOAD_BYTES
     )
     if upload_too_large:
-        st.error("ZIP upload exceeds the 10 MB limit.")
+        st.sidebar.error("ZIP upload exceeds the 10 MB limit.")
     if st.sidebar.button(
         "Scan upload", disabled=uploaded_zip is None or upload_too_large
     ):
         if uploaded_zip is None:
-            st.error("Select a ZIP file to upload.")
+            st.sidebar.error("Select a ZIP file to upload.")
         else:
             upload_data = uploaded_zip.getvalue()
             if len(upload_data) > _MAX_UPLOAD_BYTES:
-                st.error("ZIP upload exceeds the 10 MB limit.")
+                st.sidebar.error("ZIP upload exceeds the 10 MB limit.")
             else:
+                st.session_state["scan_started"] = True
+                splash_placeholder.empty()
                 with st.status("Uploading... Analysing... Querying OSV...") as status:
                     scan_result = run_scan_zip(upload_data)
                     status.update(
@@ -67,15 +72,17 @@ if hasattr(st.sidebar, "file_uploader"):
                         else "error",
                     )
                 st.session_state["scan"] = scan_result
-if st.sidebar.button("Scan ground-truth demo"):
-    with st.spinner("Scanning repository..."):
-        demo_path = "fixtures/ground_truth_repo" if public_mode else repo_path
-        st.session_state["scan"] = run_scan(demo_path)
-if not public_mode and "scan" not in st.session_state:
-    with st.spinner("Scanning repository..."):
-        st.session_state["scan"] = run_scan("fixtures/ground_truth_repo")
 if "scan" not in st.session_state:
-    st.info("Scan a GitHub repository or choose the bundled demo to get started.")
+    if not st.session_state.get("scan_started"):
+        splash_placeholder.markdown(
+            f"""
+            <div class="hawkeye-splash">
+                <img src="{_logo_data_uri}" alt="HawkEye logo" />
+                <div class="hawkeye-splash-name">HawkEye</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     st.stop()
 scan = st.session_state["scan"]
 if scan.get("ok") is False:
